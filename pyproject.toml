@@ -1,0 +1,11 @@
+[project]
+name = "smart-legal-assistance"
+version = "0.1.0"
+description = "A smart legal assistance tool leveraging AI and document processing."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dotenv>=0.9.9",
+    "pinecone[asyncio]>=8.0.0",
+    "pymupdf>=1.26.7",
+]
