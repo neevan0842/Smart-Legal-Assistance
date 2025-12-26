@@ -9,6 +9,9 @@ class QueryRequest(BaseModel):
     top_n: int = Field(
         10, ge=1, le=50, description="Number of results to keep after reranking"
     )
+    stream: bool = Field(
+        False, description="Whether to stream the response or return it complete"
+    )
 
 
 class QueryResponse(BaseModel):

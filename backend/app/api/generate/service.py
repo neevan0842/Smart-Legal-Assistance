@@ -1,9 +1,10 @@
 import asyncio
+from typing import AsyncGenerator, Tuple
 from fastapi import Request
 from ...core.config import settings
 
 
-def merge_chunks(h1, h2):
+def _merge_chunks(h1, h2):
     """Get the unique hits from two search results and return them as single array."""
     # Deduplicate by _id
     deduped_hits = {
@@ -27,10 +28,26 @@ def merge_chunks(h1, h2):
     return result
 
 
-async def generate_answer(
+def _build_context_from_results(reranked_result) -> str:
+    """Build context string from reranked results."""
+    return "\n\n".join(
+        f"{hit['document']['_id'].split('_')[0]} - Section {int(hit['document']['metadata']['section_number'])} - {hit['document']['content']}"
+        for hit in reranked_result.data
+    )
+
+
+def _create_system_message(context: str) -> str:
+    """Create system prompt with context."""
+    return f"Answer any use questions based solely on the context below:\n\n<context>\n{context.strip()}\n</context>"
+
+
+async def _retrieve_and_rerank(
     request: Request, query: str, top_k: int = 20, top_n: int = 10
-) -> str:
-    """Generate an answer for a legal query using RAG."""
+) -> Tuple[str, any]:
+    """
+    Retrieve relevant documents using RAG and rerank them.
+    Returns the context string and app state objects for LLM calls.
+    """
     # Get app state objects
     async_dense_index = request.app.state.async_dense_index
     async_sparse_index = request.app.state.async_sparse_index
@@ -49,10 +66,8 @@ async def generate_answer(
         ),
     )
 
-    # Merge results
-    merged_results = merge_chunks(sparse_response, dense_response)
-
-    # Rerank results
+    # Merge and rerank results
+    merged_results = _merge_chunks(sparse_response, dense_response)
     reranked_result = await pc_async.inference.rerank(
         model="bge-reranker-v2-m3",
         query=query,
@@ -63,28 +78,57 @@ async def generate_answer(
         parameters={"truncate": "END"},
     )
 
-    # Build context from reranked results
-    combined_context = "\n\n".join(
-        f"{hit['document']['_id'].split('_')[0]} - Section {int(hit['document']['metadata']['section_number'])} - {hit['document']['content']}"
-        for hit in reranked_result.data
+    # Build context and system message
+    context = _build_context_from_results(reranked_result)
+    system_message = _create_system_message(context)
+
+    return system_message, groq_client
+
+
+async def generate_answer(
+    request: Request, query: str, top_k: int = 20, top_n: int = 10
+) -> str:
+    """Generate an answer for a legal query using RAG."""
+    system_message, groq_client = await _retrieve_and_rerank(
+        request, query, top_k, top_n
     )
 
-    # Create system prompt
-    system_message = f"Answer any use questions based solely on the context below:\n\n<context>\n{combined_context.strip()}\n</context>"
-
-    # Get response from LLM
+    # Get complete response from LLM
     chat_completion = await groq_client.chat.completions.create(
         messages=[
-            {
-                "role": "system",
-                "content": system_message,
-            },
-            {
-                "role": "user",
-                "content": query,
-            },
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": query},
         ],
         model=settings.LLM_MODEL_NAME,
     )
 
     return chat_completion.choices[0].message.content
+
+
+async def generate_answer_stream(
+    request: Request, query: str, top_k: int = 20, top_n: int = 10
+) -> AsyncGenerator[str, None]:
+    """Generate an answer for a legal query using RAG with streaming."""
+    system_message, groq_client = await _retrieve_and_rerank(
+        request, query, top_k, top_n
+    )
+
+    # Get streaming response from LLM
+    stream = await groq_client.chat.completions.create(
+        messages=[
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": query},
+        ],
+        model=settings.LLM_MODEL_NAME,
+        stream=True,
+    )
+
+    # Yield chunks as they arrive in SSE format
+    async for chunk in stream:
+        if chunk.choices[0].delta.content:
+            content = chunk.choices[0].delta.content
+            # Format as Server-Sent Events
+            yield f"data: {content}\n\n"
+
+    # Send completion marker
+    yield "data: [DONE]\n\n"
