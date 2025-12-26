@@ -1,11 +1,12 @@
+import asyncio
 import fitz
 import re
 import os
 import json
 from typing import List, Dict
 from dotenv import load_dotenv
-from pinecone import Pinecone
-
+from groq import AsyncGroq
+from pinecone import Pinecone, PineconeAsyncio
 
 load_dotenv()
 
@@ -14,15 +15,28 @@ PINECONE_DENSE_INDEX_NAME = os.getenv("PINECONE_DENSE_INDEX_NAME")
 PINECONE_SPARSE_INDEX_NAME = os.getenv("PINECONE_SPARSE_INDEX_NAME")
 PINECONE_DENSE_INDEX_MODEL = os.getenv("PINECONE_DENSE_INDEX_MODEL")
 PINECONE_SPARSE_INDEX_MODEL = os.getenv("PINECONE_SPARSE_INDEX_MODEL")
+PINECONE_DENSE_HOST = os.getenv("PINECONE_DENSE_HOST")
+PINECONE_SPARSE_HOST = os.getenv("PINECONE_SPARSE")
+LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if (
-    not PINECONE_API_KEY
-    or not PINECONE_DENSE_INDEX_NAME
-    or not PINECONE_SPARSE_INDEX_NAME
-    or not PINECONE_DENSE_INDEX_MODEL
-    or not PINECONE_SPARSE_INDEX_MODEL
+if not all(
+    PINECONE_API_KEY,
+    PINECONE_DENSE_INDEX_NAME,
+    PINECONE_SPARSE_INDEX_NAME,
+    PINECONE_DENSE_INDEX_MODEL,
+    PINECONE_SPARSE_INDEX_MODEL,
+    PINECONE_DENSE_HOST,
+    PINECONE_SPARSE_HOST,
+    LLM_MODEL_NAME,
+    GROQ_API_KEY,
 ):
     raise ValueError("Missing required environment variables.")
+
+pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
+async_dense_index = pc_async.IndexAsyncio(host=PINECONE_DENSE_HOST)
+async_sparse_index = pc_async.IndexAsyncio(host=PINECONE_SPARSE_HOST)
+async_client = AsyncGroq(api_key=GROQ_API_KEY)
 
 
 def extract_sections_general(pdf_path: str) -> List[Dict]:
@@ -204,3 +218,105 @@ def create_replace_index():
         embed={"model": PINECONE_SPARSE_INDEX_MODEL, "field_map": {"text": "content"}},
     )
     print(f"Created new sparse index: {PINECONE_SPARSE_INDEX_NAME}")
+
+
+def merge_chunks(h1, h2):
+    """Get the unique hits from two search results and return them as single array of {'_id', 'chunk_text'} dicts, printing each dict on a new line."""
+    # Deduplicate by _id
+    deduped_hits = {
+        hit["_id"]: hit for hit in h1["result"]["hits"] + h2["result"]["hits"]
+    }.values()
+    # Sort by _score descending
+    sorted_hits = sorted(deduped_hits, key=lambda x: x["_score"], reverse=True)
+    # Transform to format for reranking
+    result = [
+        {
+            "_id": hit["_id"],
+            "content": hit["fields"]["content"],
+            "metadata": {
+                "chunk": hit["fields"]["chunk"],
+                "is_chunked": hit["fields"]["is_chunked"],
+                "section_number": hit["fields"]["section_number"],
+            },
+        }
+        for hit in sorted_hits
+    ]
+    return result
+
+
+async def query_dense_index_async(query: str, top_k: int = 20):
+    """Query the dense index asynchronously."""
+    return await async_dense_index.search_records(
+        namespace="bns_and_bnss",
+        query={"top_k": top_k, "inputs": {"text": query}},
+    )
+
+
+async def query_sparse_index_async(query: str, top_k: int = 20):
+    """Query the sparse index asynchronously."""
+    return await async_sparse_index.search_records(
+        namespace="bns_and_bnss",
+        query={"top_k": top_k, "inputs": {"text": query}},
+    )
+
+
+async def query_legal_assistant_async(
+    query: str, top_k: int = 20, top_n: int = 10
+) -> str:
+    """
+    Async version: Query the legal assistant with a question and get an answer based on RAG.
+    Uses Pinecone's native async methods with IndexAsyncio.
+
+    Args:
+        query: The user's legal question
+        top_k: Number of results to retrieve from each index
+        top_n: Number of results to keep after reranking
+
+    Returns:
+        The AI assistant's answer
+    """
+
+    # Run both searches concurrently using asyncio.gather
+    dense_response, sparse_response = await asyncio.gather(
+        query_dense_index_async(query, top_k), query_sparse_index_async(query, top_k)
+    )
+
+    # Merge results
+    merged_results = merge_chunks(sparse_response, dense_response)
+
+    # Rerank results (using asyncio.to_thread for sync operation)
+    reranked_result = await pc_async.inference.rerank(
+        model="bge-reranker-v2-m3",
+        query=query,
+        documents=merged_results,
+        rank_fields=["content"],
+        top_n=top_n,
+        return_documents=True,
+        parameters={"truncate": "END"},
+    )
+
+    # Build context from reranked results
+    combined_context = "\n\n".join(
+        f"{hit['document']['_id'].split('_')[0]} - Section {int(hit['document']['metadata']['section_number'])} - {hit['document']['content']}"
+        for hit in reranked_result.data
+    )
+
+    # Create system prompt using langchain-ai/retrieval-qa-chat template
+    system_message = f"Answer any use questions based solely on the context below:\n\n<context>\n{combined_context.strip()}\n</context>"
+
+    # Get response from LLM using async client
+    chat_completion = await async_client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": system_message,
+            },
+            {
+                "role": "user",
+                "content": query,
+            },
+        ],
+        model=LLM_MODEL_NAME,
+    )
+
+    return chat_completion.choices[0].message.content
