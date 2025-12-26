@@ -1,32 +1,22 @@
-import os
 from pinecone import Pinecone
 from pathlib import Path
-from dotenv import load_dotenv
-from utils import (
+from backend.scripts.utils import (
     extract_sections_general,
     save_as_json,
     chunk_data,
     create_replace_index,
     chunk_long_sections,
 )
+from backend.core.config import settings
 
-load_dotenv()
 
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_DENSE_INDEX_NAME = os.getenv("PINECONE_DENSE_INDEX_NAME")
-PINECONE_SPARSE_INDEX_NAME = os.getenv("PINECONE_SPARSE_INDEX_NAME")
-PINECONE_DENSE_HOST = os.getenv("PINECONE_DENSE_HOST")
-PINECONE_SPARSE_HOST = os.getenv("PINECONE_SPARSE_HOST")
+PINECONE_API_KEY = settings.PINECONE_API_KEY
+PINECONE_DENSE_INDEX_NAME = settings.PINECONE_DENSE_INDEX_NAME
+PINECONE_SPARSE_INDEX_NAME = settings.PINECONE_SPARSE_INDEX_NAME
+PINECONE_DENSE_HOST = settings.PINECONE_DENSE_HOST
+PINECONE_SPARSE_HOST = settings.PINECONE_SPARSE_HOST
 MAX_BATCH_SIZE = 96
 
-if (
-    not PINECONE_API_KEY
-    or not PINECONE_DENSE_INDEX_NAME
-    or not PINECONE_SPARSE_INDEX_NAME
-    or not PINECONE_DENSE_HOST
-    or not PINECONE_SPARSE_HOST
-):
-    raise ValueError("Missing required Pinecone environment variables.")
 
 pc = Pinecone(api_key=PINECONE_API_KEY)
 

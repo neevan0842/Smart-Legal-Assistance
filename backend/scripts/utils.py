@@ -1,42 +1,22 @@
 import asyncio
 import fitz
 import re
-import os
 import json
 from typing import List, Dict
-from dotenv import load_dotenv
 from groq import AsyncGroq
 from pinecone import Pinecone, PineconeAsyncio
+from backend.core.config import settings
 
-load_dotenv()
 
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-PINECONE_DENSE_INDEX_NAME = os.getenv("PINECONE_DENSE_INDEX_NAME")
-PINECONE_SPARSE_INDEX_NAME = os.getenv("PINECONE_SPARSE_INDEX_NAME")
-PINECONE_DENSE_INDEX_MODEL = os.getenv("PINECONE_DENSE_INDEX_MODEL")
-PINECONE_SPARSE_INDEX_MODEL = os.getenv("PINECONE_SPARSE_INDEX_MODEL")
-PINECONE_DENSE_HOST = os.getenv("PINECONE_DENSE_HOST")
-PINECONE_SPARSE_HOST = os.getenv("PINECONE_SPARSE")
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-
-if not all(
-    PINECONE_API_KEY,
-    PINECONE_DENSE_INDEX_NAME,
-    PINECONE_SPARSE_INDEX_NAME,
-    PINECONE_DENSE_INDEX_MODEL,
-    PINECONE_SPARSE_INDEX_MODEL,
-    PINECONE_DENSE_HOST,
-    PINECONE_SPARSE_HOST,
-    LLM_MODEL_NAME,
-    GROQ_API_KEY,
-):
-    raise ValueError("Missing required environment variables.")
-
-pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
-async_dense_index = pc_async.IndexAsyncio(host=PINECONE_DENSE_HOST)
-async_sparse_index = pc_async.IndexAsyncio(host=PINECONE_SPARSE_HOST)
-async_client = AsyncGroq(api_key=GROQ_API_KEY)
+PINECONE_API_KEY = settings.PINECONE_API_KEY
+PINECONE_DENSE_INDEX_NAME = settings.PINECONE_DENSE_INDEX_NAME
+PINECONE_SPARSE_INDEX_NAME = settings.PINECONE_SPARSE_INDEX_NAME
+PINECONE_DENSE_INDEX_MODEL = settings.PINECONE_DENSE_INDEX_MODEL
+PINECONE_SPARSE_INDEX_MODEL = settings.PINECONE_SPARSE_INDEX_MODEL
+PINECONE_DENSE_HOST = settings.PINECONE_DENSE_HOST
+PINECONE_SPARSE_HOST = settings.PINECONE_SPARSE_HOST
+LLM_MODEL_NAME = settings.LLM_MODEL_NAME
+GROQ_API_KEY = settings.GROQ_API_KEY
 
 
 def extract_sections_general(pdf_path: str) -> List[Dict]:
@@ -246,6 +226,8 @@ def merge_chunks(h1, h2):
 
 async def query_dense_index_async(query: str, top_k: int = 20):
     """Query the dense index asynchronously."""
+    pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
+    async_dense_index = pc_async.IndexAsyncio(host=PINECONE_DENSE_HOST)
     return await async_dense_index.search_records(
         namespace="bns_and_bnss",
         query={"top_k": top_k, "inputs": {"text": query}},
@@ -254,6 +236,8 @@ async def query_dense_index_async(query: str, top_k: int = 20):
 
 async def query_sparse_index_async(query: str, top_k: int = 20):
     """Query the sparse index asynchronously."""
+    pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
+    async_sparse_index = pc_async.IndexAsyncio(host=PINECONE_SPARSE_HOST)
     return await async_sparse_index.search_records(
         namespace="bns_and_bnss",
         query={"top_k": top_k, "inputs": {"text": query}},
@@ -275,6 +259,9 @@ async def query_legal_assistant_async(
     Returns:
         The AI assistant's answer
     """
+
+    pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
+    async_client = AsyncGroq(api_key=GROQ_API_KEY)
 
     # Run both searches concurrently using asyncio.gather
     dense_response, sparse_response = await asyncio.gather(
