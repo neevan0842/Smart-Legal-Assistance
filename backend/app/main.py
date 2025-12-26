@@ -2,7 +2,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from groq import AsyncGroq
 from .core.config import settings
+from .api.generate import api as generate
 from .middlewares.logger import LoggingMiddleware
 from pinecone import PineconeAsyncio
 
@@ -10,18 +12,25 @@ FRONTEND_URLS = settings.FRONTEND_URLS
 PINECONE_API_KEY = settings.PINECONE_API_KEY
 PINECONE_DENSE_HOST = settings.PINECONE_DENSE_HOST
 PINECONE_SPARSE_HOST = settings.PINECONE_SPARSE_HOST
+GROQ_API_KEY = settings.GROQ_API_KEY
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
-    async_dense_index = pc_async.IndexAsyncio(host=PINECONE_DENSE_HOST)
-    async_sparse_index = pc_async.IndexAsyncio(host=PINECONE_SPARSE_HOST)
+    app.state.pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
+    app.state.async_dense_index = app.state.pc_async.IndexAsyncio(
+        host=PINECONE_DENSE_HOST
+    )
+    app.state.async_sparse_index = app.state.pc_async.IndexAsyncio(
+        host=PINECONE_SPARSE_HOST
+    )
+    app.state.groq_client = AsyncGroq(api_key=GROQ_API_KEY)
 
     yield
 
-    await async_dense_index.close()
-    await async_sparse_index.close()
+    await app.state.async_dense_index.close()
+    await app.state.async_sparse_index.close()
+    await app.state.groq_client.close()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -36,7 +45,7 @@ app.add_middleware(
 )
 app.add_middleware(LoggingMiddleware)
 
-# app.include_router(router=auth.router, prefix="/api/v1")
+app.include_router(router=generate.router, prefix="/api")
 
 
 # Root route
