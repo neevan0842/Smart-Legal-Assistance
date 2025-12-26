@@ -1,13 +1,13 @@
 from pinecone import Pinecone
 from pathlib import Path
-from backend.scripts.utils import (
+from .utils import (
     extract_sections_general,
     save_as_json,
     chunk_data,
     create_replace_index,
     chunk_long_sections,
 )
-from backend.core.config import settings
+from app.core.config import settings
 
 
 PINECONE_API_KEY = settings.PINECONE_API_KEY
@@ -20,9 +20,11 @@ MAX_BATCH_SIZE = 96
 
 pc = Pinecone(api_key=PINECONE_API_KEY)
 
-bns_path = Path.cwd() / "documents" / "BNS.pdf"
-bnss_path = Path.cwd() / "documents" / "BNSS.pdf"
-output_dir = Path.cwd() / "contents"
+# Get the script directory and use it as base for relative paths
+script_dir = Path(__file__).parent
+bns_path = script_dir / "documents" / "BNS.pdf"
+bnss_path = script_dir / "documents" / "BNSS.pdf"
+output_dir = script_dir / "contents"
 
 bns = extract_sections_general(bns_path.as_posix())
 print(f"Extracted BNS sections")

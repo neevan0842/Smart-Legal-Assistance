@@ -5,6 +5,7 @@ description = "A smart legal assistance tool leveraging AI and document processi
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi[standard]>=0.127.0",
     "groq>=1.0.0",
     "pinecone[asyncio,grpc]>=8.0.0",
     "pydantic-settings>=2.12.0",

@@ -5,7 +5,7 @@ import json
 from typing import List, Dict
 from groq import AsyncGroq
 from pinecone import Pinecone, PineconeAsyncio
-from backend.core.config import settings
+from app.core.config import settings
 
 
 PINECONE_API_KEY = settings.PINECONE_API_KEY
