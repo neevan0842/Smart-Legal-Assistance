@@ -36,7 +36,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 ### 2. Clone and Navigate
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/neevan0842/Smart-Legal-Assistance.git
 cd Smart-Legal-Assistance/backend
 ```
 
