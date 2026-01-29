@@ -1,4 +1,5 @@
-from pinecone import Pinecone
+import asyncio
+from pinecone import PineconeAsyncio
 from pathlib import Path
 from .utils import (
     extract_sections_general,
@@ -18,7 +19,7 @@ PINECONE_SPARSE_HOST = settings.PINECONE_SPARSE_HOST
 MAX_BATCH_SIZE = 96
 
 
-pc = Pinecone(api_key=PINECONE_API_KEY)
+pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
 
 # Get the script directory and use it as base for relative paths
 script_dir = Path(__file__).parent
@@ -37,21 +38,48 @@ bns_and_bnss = chunk_long_sections(bns + bnss)
 save_as_json(bns_and_bnss, output_dir / "bns_and_bnss.json")
 print(f"bns_and_bnss saved to JSON with {len(bns_and_bnss)} sections.")
 
-create_replace_index()
 
-if not pc.has_index(PINECONE_DENSE_INDEX_NAME) or not pc.has_index(
-    PINECONE_SPARSE_INDEX_NAME
-):
-    raise ValueError(
-        "Required Pinecone indexes do not exist. Please create them first."
-    )
+async def main():
+    await create_replace_index()
 
-dense_index = pc.Index(host=PINECONE_DENSE_HOST)
-sparse_index = pc.Index(host=PINECONE_SPARSE_HOST)
+    if not await pc_async.has_index(
+        PINECONE_DENSE_INDEX_NAME
+    ) or not await pc_async.has_index(PINECONE_SPARSE_INDEX_NAME):
+        raise ValueError(
+            "Required Pinecone indexes do not exist. Please create them first."
+        )
 
-for i, batch in enumerate(chunk_data(bns_and_bnss, MAX_BATCH_SIZE)):
-    dense_index.upsert_records("bns_and_bnss", batch)
-    sparse_index.upsert_records("bns_and_bnss", batch)
-    print(f"Upserted batch {i+1} out of {len(bns_and_bnss)//MAX_BATCH_SIZE} records.")
+    dense_index = pc_async.IndexAsyncio(host=PINECONE_DENSE_HOST)
+    sparse_index = pc_async.IndexAsyncio(host=PINECONE_SPARSE_HOST)
 
-print("Upserted all records into both indexes.")
+    sem = asyncio.Semaphore(5)  # Limit concurrent upserts to avoid rate limits
+
+    try:
+        total_batches = (len(bns_and_bnss) + MAX_BATCH_SIZE - 1) // MAX_BATCH_SIZE
+
+        async def bounded_upsert(i, index, records, index_name):
+            async with sem:
+                await index.upsert_records("bns_and_bnss", records)
+                print(
+                    f"Upserted batch {i+1} out of {total_batches} records into {index_name}."
+                )
+
+        tasks = [
+            bounded_upsert(i, dense_index, batch, PINECONE_DENSE_INDEX_NAME)
+            for i, batch in enumerate(chunk_data(bns_and_bnss, MAX_BATCH_SIZE))
+        ]
+        tasks += [
+            bounded_upsert(i, sparse_index, batch, PINECONE_SPARSE_INDEX_NAME)
+            for i, batch in enumerate(chunk_data(bns_and_bnss, MAX_BATCH_SIZE))
+        ]
+        await asyncio.gather(*tasks)
+
+        print("Upserted all records into both indexes.")
+    finally:
+        await dense_index.close()
+        await sparse_index.close()
+        await pc_async.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

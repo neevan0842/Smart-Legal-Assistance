@@ -4,7 +4,7 @@ import re
 import json
 from typing import List, Dict
 from groq import AsyncGroq
-from pinecone import Pinecone, PineconeAsyncio
+from pinecone import PineconeAsyncio
 from app.core.config import settings
 
 
@@ -173,31 +173,39 @@ def chunk_long_sections(
     return chunked_sections
 
 
-def create_replace_index():
-    pc = Pinecone(api_key=PINECONE_API_KEY)
-
-    index_list_response = pc.list_indexes()
+async def create_replace_index():
+    pc = PineconeAsyncio(api_key=PINECONE_API_KEY)
+    index_list_response = await pc.list_indexes()
+    sem = asyncio.Semaphore(3)
 
     if index_list_response:
-        for index in index_list_response:
-            pc.delete_index(index["name"])
-            print(f"Deleted index: {index['name']}")
 
-    pc.create_index_for_model(
-        name=PINECONE_DENSE_INDEX_NAME,
-        cloud="aws",
-        region="us-east-1",
-        embed={"model": PINECONE_DENSE_INDEX_MODEL, "field_map": {"text": "content"}},
-    )
-    print(f"Created new dense index: {PINECONE_DENSE_INDEX_NAME}")
+        async def bounded_delete(index_name):
+            async with sem:
+                await pc.delete_index(index_name)
+                print(f"Deleted index: {index_name}")
 
-    pc.create_index_for_model(
-        name=PINECONE_SPARSE_INDEX_NAME,
-        cloud="aws",
-        region="us-east-1",
-        embed={"model": PINECONE_SPARSE_INDEX_MODEL, "field_map": {"text": "content"}},
-    )
-    print(f"Created new sparse index: {PINECONE_SPARSE_INDEX_NAME}")
+        tasks = [bounded_delete(index["name"]) for index in index_list_response]
+        await asyncio.gather(*tasks)
+
+    async def bounded_create(index_name, model):
+        async with sem:
+            await pc.create_index_for_model(
+                name=index_name,
+                cloud="aws",
+                region="us-east-1",
+                embed={"model": model, "field_map": {"text": "content"}},
+            )
+            print(f"Created new index: {index_name}")
+
+    tasks = [
+        bounded_create(PINECONE_DENSE_INDEX_NAME, PINECONE_DENSE_INDEX_MODEL),
+        bounded_create(PINECONE_SPARSE_INDEX_NAME, PINECONE_SPARSE_INDEX_MODEL),
+    ]
+    await asyncio.gather(*tasks)
+    
+    # Close the Pinecone client
+    await pc.close()
 
 
 def merge_chunks(h1, h2):
@@ -228,20 +236,26 @@ async def query_dense_index_async(query: str, top_k: int = 20):
     """Query the dense index asynchronously."""
     pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
     async_dense_index = pc_async.IndexAsyncio(host=PINECONE_DENSE_HOST)
-    return await async_dense_index.search_records(
-        namespace="bns_and_bnss",
-        query={"top_k": top_k, "inputs": {"text": query}},
-    )
+    try:
+        return await async_dense_index.search_records(
+            namespace="bns_and_bnss",
+            query={"top_k": top_k, "inputs": {"text": query}},
+        )
+    finally:
+        await pc_async.close()
 
 
 async def query_sparse_index_async(query: str, top_k: int = 20):
     """Query the sparse index asynchronously."""
     pc_async = PineconeAsyncio(api_key=PINECONE_API_KEY)
     async_sparse_index = pc_async.IndexAsyncio(host=PINECONE_SPARSE_HOST)
-    return await async_sparse_index.search_records(
-        namespace="bns_and_bnss",
-        query={"top_k": top_k, "inputs": {"text": query}},
-    )
+    try:
+        return await async_sparse_index.search_records(
+            namespace="bns_and_bnss",
+            query={"top_k": top_k, "inputs": {"text": query}},
+        )
+    finally:
+        await pc_async.close()
 
 
 async def query_legal_assistant_async(
@@ -305,5 +319,7 @@ async def query_legal_assistant_async(
         ],
         model=LLM_MODEL_NAME,
     )
+
+    await pc_async.close()
 
     return chat_completion.choices[0].message.content
