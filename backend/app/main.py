@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
     await app.state.async_dense_index.close()
     await app.state.async_sparse_index.close()
     await app.state.groq_client.close()
+    await app.state.pc_async.close()
 
 
 app = FastAPI(lifespan=lifespan)
