@@ -1,7 +1,7 @@
 import asyncio
 from pinecone import PineconeAsyncio
 from pathlib import Path
-from .utils import (
+from scripts.utils import (
     extract_sections_general,
     save_as_json,
     chunk_data,

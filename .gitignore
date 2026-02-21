@@ -62,7 +62,7 @@ logs/
 *.sqlite
 
 # Generated Content
-backend/scripts/contents/*.json
+/scripts/contents/*.json
 
 # OS
 Thumbs.db
