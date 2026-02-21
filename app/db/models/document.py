@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import String, TIMESTAMP, Text, func
+from sqlalchemy import String, TIMESTAMP, Text, func, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from datetime import datetime
@@ -12,7 +12,9 @@ class Document(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
     filename: Mapped[str] = mapped_column(String, nullable=False)
     filepath: Mapped[str] = mapped_column(String, nullable=False)
 
@@ -32,7 +34,9 @@ class GeneratedDocument(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
 
     document_type: Mapped[str] = mapped_column(String(255))
     prompt: Mapped[str] = mapped_column(Text)
