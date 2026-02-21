@@ -4,9 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.utils.groq import GroqService
 from app.utils.pinecone import PineconeService
-from .core.config import settings
-from .api.generate import api as generate
-from .middlewares.logger import LoggingMiddleware
+from app.core.config import settings
+from app.api import generate
+from app.middlewares.logger import LoggingMiddleware
 
 FRONTEND_URLS = settings.FRONTEND_URLS
 

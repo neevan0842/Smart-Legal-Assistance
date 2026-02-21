@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from app.api.generate.schema import QueryRequest, QueryResponse
-from app.api.generate.service import generate_answer, generate_answer_stream
+from app.schema.generate import QueryRequest, QueryResponse
+from app.service.generate import generate_answer, generate_answer_stream
 from app.core.dependencies import get_groq_service, get_pinecone_service
 
 

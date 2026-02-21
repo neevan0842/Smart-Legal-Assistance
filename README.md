@@ -156,47 +156,44 @@ Smart-Legal-Assistance/
 ├── LICENSE
 ├── pyproject.toml              # Project dependencies
 ├── README.md
-├── .env                        # Environment variables (create from .env.sample)
-├── .env.sample                 # Environment template
-├── .gitignore
-├── .python-version
-├── docker-compose.yml
 ├── alembic.ini
-├── uv.lock
+├── docker-compose.yml
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
 │   ├── api/
 │   │   ├── __init__.py
-│   │   └── generate/
-│   │       ├── __init__.py
-│   │       ├── api.py          # Route handlers
-│   │       ├── schema.py       # Pydantic models
-│   │       ├── service.py      # Business logic
+│   │   ├── generate.py
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py           # Settings management
 │   │   ├── constants.py
 │   │   ├── dependencies.py
-│   │   └── logger.py
+│   │   ├── logger.py
 │   ├── db/
 │   │   ├── __init__.py
 │   │   ├── base.py
 │   │   ├── session.py
-│   │   └── models/
-│   │       ├── __init__.py
-│   │       ├── chat.py
-│   │       ├── document.py
-│   │       ├── evaluation.py
-│   │       └── user.py
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── chat.py
+│   │   │   ├── document.py
+│   │   │   ├── evaluation.py
+│   │   │   ├── user.py
 │   ├── middlewares/
 │   │   ├── __init__.py
-│   │   └── logger.py           # Logging & security headers
-│   └── utils/
-│       ├── __init__.py
-│       ├── groq.py
-│       ├── pinecone.py
-│       └── utils.py
+│   │   ├── logger.py           # Logging & security headers
+│   ├── schema/
+│   │   ├── __init__.py
+│   │   ├── generate.py
+│   ├── service/
+│   │   ├── __init__.py
+│   │   ├── generate.py
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── groq.py
+│   │   ├── pinecone.py
+│   │   ├── utils.py
 ├── scripts/
 │   ├── extraction.py
 │   ├── pinecone_seeding.py
@@ -204,15 +201,15 @@ Smart-Legal-Assistance/
 │   ├── contents/
 │   │   ├── bns_and_bnss.json
 │   │   ├── bns.json
-│   │   └── bnss.json
-│   └── documents/              # Place PDFs here
+│   │   ├── bnss.json
+│   ├── documents/              # Place PDFs here
 ├── alembic/
 │   ├── env.py
 │   ├── README
 │   ├── script.py.mako
-│   └── versions/
-│       └── 7e5e8ebfa7a0_initial_migration.py
-└── .venv/                      # Python virtual environment (not committed)
+│   ├── versions/
+│   │   ├── 7e5e8ebfa7a0_initial_migration.py
+└── .venv/                      # Python virtual environment
 ```
 
 ## Development
