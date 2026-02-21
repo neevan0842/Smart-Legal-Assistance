@@ -78,3 +78,11 @@ def chunk_long_sections(
                 )
 
     return chunked_sections
+
+
+def create_system_message(context: str) -> str:
+    """Create system prompt with context."""
+    return f"""You are a helpful legal assistant. Use only the following context to answer the question. 
+    If you don't know the answer, say you don't know. 
+    Always use all relevant information from the context to provide a complete and accurate answer.
+    \n\n<context>\n{context.strip()}\n</context>"""

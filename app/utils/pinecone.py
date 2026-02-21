@@ -1,9 +1,11 @@
 import asyncio
 from typing import List
 from pinecone import PineconeAsyncio
+from app.core.constants import NAMESPACE
 from app.core.logger import logger
 from app.core.config import settings
 from app.utils.utils import chunk_data
+
 
 PINECONE_API_KEY = settings.PINECONE_API_KEY
 PINECONE_DENSE_HOST = settings.PINECONE_DENSE_HOST
@@ -13,8 +15,6 @@ PINECONE_SPARSE_INDEX_NAME = settings.PINECONE_SPARSE_INDEX_NAME
 PINECONE_DENSE_INDEX_MODEL = settings.PINECONE_DENSE_INDEX_MODEL
 PINECONE_SPARSE_INDEX_MODEL = settings.PINECONE_SPARSE_INDEX_MODEL
 PINECONE_RERANKING_MODEL = settings.PINECONE_RERANKING_MODEL
-
-NAMESPACE = "legal_law_documents"
 
 
 class PineconeService:
@@ -41,7 +41,7 @@ class PineconeService:
             or not self.async_dense_index
             or not self.async_sparse_index
         ):
-            raise ValueError("Pinecone clients have not been initialized.")
+            self.initialize_clients()
         return self.pc_async, self.async_dense_index, self.async_sparse_index
 
     async def close_clients(self):
@@ -140,7 +140,7 @@ class PineconeService:
             logger.error(f"Error upserting records: {e}")
 
     async def query_and_rerank(
-        self, query: str, top_k: int = 15, top_n: int = 10
+        self, query: str, top_k: int = 20, top_n: int = 10
     ) -> str:
         """Queries both dense and sparse indexes concurrently, merges results, and reranks them using Pinecone's inference API."""
         # Query both indexes concurrently

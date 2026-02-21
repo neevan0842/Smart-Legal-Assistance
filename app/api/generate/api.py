@@ -1,14 +1,19 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from .schema import QueryRequest, QueryResponse
-from .service import generate_answer, generate_answer_stream
+from app.api.generate.schema import QueryRequest, QueryResponse
+from app.api.generate.service import generate_answer, generate_answer_stream
+from app.core.dependencies import get_groq_service, get_pinecone_service
 
 
 router = APIRouter(prefix="/generate", tags=["generate"])
 
 
-@router.post("/", response_model=None)
-async def query_endpoint(body: QueryRequest, request: Request):
+@router.post("/", response_model=QueryResponse)
+async def query_endpoint(
+    body: QueryRequest,
+    pc_svc=Depends(get_pinecone_service),
+    groq_svc=Depends(get_groq_service),
+):
     """
     Query the legal assistant with a question and get an AI-generated answer
     based on BNS and BNSS legal documents.
@@ -20,8 +25,9 @@ async def query_endpoint(body: QueryRequest, request: Request):
         if body.stream:
             return StreamingResponse(
                 generate_answer_stream(
-                    request=request,
                     query=body.query,
+                    pc_svc=pc_svc,
+                    groq_svc=groq_svc,
                     top_k=body.top_k,
                     top_n=body.top_n,
                 ),
@@ -29,8 +35,9 @@ async def query_endpoint(body: QueryRequest, request: Request):
             )
         else:
             answer = await generate_answer(
-                request=request,
                 query=body.query,
+                pc_svc=pc_svc,
+                groq_svc=groq_svc,
                 top_k=body.top_k,
                 top_n=body.top_n,
             )

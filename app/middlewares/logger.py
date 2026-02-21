@@ -1,11 +1,7 @@
 import time
-import logging
+from app.core.logger import logger
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("fastapi.middleware")
 
 
 class LoggingMiddleware(BaseHTTPMiddleware):
