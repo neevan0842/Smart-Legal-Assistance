@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     # FRONTEND CONFIGURATION
     FRONTEND_URLS: str
 
+    # Database Configuration
+    POSTGRES_USER: str
+    POSTGRES_PASSWORD: str
+    POSTGRES_DB: str
+    POSTGRES_PORT: int
+    POSTGRES_HOST: str
+    DATABASE_URL_SYNC: str
+    DATABASE_URL_ASYNC: str
+
     model_config = ConfigDict(env_file=".env")
 
 
