@@ -37,7 +37,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ```bash
 git clone https://github.com/neevan0842/Smart-Legal-Assistance.git
-cd Smart-Legal-Assistance/backend
+cd Smart-Legal-Assistance
 ```
 
 ### 3. Set Up Environment Variables
@@ -59,6 +59,7 @@ PINECONE_DENSE_INDEX_MODEL=llama-text-embed-v2
 PINECONE_SPARSE_INDEX_MODEL=pinecone-sparse-english-v0
 PINECONE_DENSE_HOST=https://your-dense-index-host.pinecone.io
 PINECONE_SPARSE_HOST=https://your-sparse-index-host.pinecone.io
+PINECONE_RERANKING_MODEL=bge-reranker-v2-m3
 
 # GROQ CONFIGURATION
 GROQ_API_KEY=your_groq_api_key_here
@@ -89,11 +90,9 @@ FRONTEND_URLS=http://localhost:3000
 uv sync
 ```
 
-This will create a virtual environment and install all dependencies from `pyproject.toml`.
-
 ### 5. Place Legal Documents
 
-Add your PDF documents to `backend/scripts/documents/`:
+Add your PDF documents to `scripts/documents/`:
 
 - `BNS.pdf` - Bharatiya Nyaya Sanhita
 - `BNSS.pdf` - Bharatiya Nagarik Suraksha Sanhita
@@ -103,17 +102,8 @@ Add your PDF documents to `backend/scripts/documents/`:
 Run the script to extract sections from PDFs and upload to Pinecone:
 
 ```bash
-uv run python -m scripts.bns_bnss_to_pinecone
+uv run -m scripts.pinecone_seeding
 ```
-
-This script will:
-
-- Extract sections from BNS and BNSS PDFs
-- Chunk large sections to fit Pinecone limits
-- Create dense and sparse indexes
-- Upload all sections with embeddings
-
-**Note:** The first run will create the indexes. The process may take several minutes depending on document size.
 
 ### 7. Start the Server
 
@@ -138,65 +128,38 @@ Once the server is running, access:
 - **Swagger UI:** http://127.0.0.1:8000/docs
 - **ReDoc:** http://127.0.0.1:8000/redoc
 
-## API Usage
-
-### Query Endpoint
-
-**POST** `/api/generate/`
-
-#### Request Body:
-
-```json
-{
-  "query": "What is the punishment for theft?",
-  "top_k": 20,
-  "top_n": 10,
-  "stream": false
-}
-```
-
-#### Parameters:
-
-- `query` (string, required): Your legal question
-- `top_k` (integer, optional): Number of results to retrieve from each index (default: 20)
-- `top_n` (integer, optional): Number of results after reranking (default: 10)
-- `stream` (boolean, optional): Enable streaming response (default: false)
-
-#### Non-streaming Response:
-
-```json
-{
-  "answer": "According to Section 303 of BNS...",
-  "query": "What is the punishment for theft?"
-}
-```
-
-#### Streaming Response:
-
-Set `"stream": true` to receive chunks in real-time via Server-Sent Events (SSE).
-
 ## Project Structure
 
 ```
-backend/
+Smart-Legal-Assistance/
+├── LICENSE
+├── pyproject.toml              # Project dependencies
+├── README.md
 ├── app/
+│   ├── __init__.py
+│   ├── main.py
 │   ├── api/
-│   │   └── generate/          # API endpoints
+│   │   ├── __init__.py
+│   │   └── generate/
+│   │       ├── __init__.py
 │   │       ├── api.py          # Route handlers
 │   │       ├── schema.py       # Pydantic models
 │   │       └── service.py      # Business logic
 │   ├── core/
+│   │   ├── __init__.py
 │   │   └── config.py           # Settings management
 │   └── middlewares/
+│       ├── __init__.py
 │       └── logger.py           # Logging & security headers
 ├── scripts/
-│   ├── documents/              # Place PDFs here
-│   ├── contents/               # Generated JSON files
+│   ├── __init__.py
 │   ├── bns_bnss_to_pinecone.py # Data ingestion script
-│   └── utils.py                # Helper functions
-├── .env                        # Environment variables (create from .env.sample)
-├── .env.sample                 # Environment template
-└── pyproject.toml              # Project dependencies
+│   ├── query.ipynb             # Query notebook
+│   ├── utils.py                # Helper functions
+│   └── contents/               # Extracted sections (auto-generated)
+│   └── documents/              # Place PDFs here
+└── .env                        # Environment variables (create from .env.sample)
+└── .env.sample                 # Environment template
 ```
 
 ## Development
@@ -210,51 +173,9 @@ uv sync
 # Add new package
 uv add package-name
 
-# Run Python scripts
-uv run python script.py
-
 # Run FastAPI
 uv run fastapi dev
 ```
-
-### Testing the API:
-
-**Using curl:**
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/generate/ \
-  -H "Content-Type: application/json" \
-  -d '{"query":"What is theft?","top_k":20,"top_n":10}'
-```
-
-**Streaming with curl:**
-
-```bash
-curl -N -X POST http://127.0.0.1:8000/api/generate/ \
-  -H "Content-Type: application/json" \
-  -d '{"query":"What is theft?","stream":true}'
-```
-
-## Troubleshooting
-
-### Import Errors
-
-Ensure you're in the `backend` directory and using `uv run`:
-
-```bash
-cd backend
-uv run python -m scripts.bns_bnss_to_pinecone
-```
-
-### Pinecone Connection Issues
-
-- Verify your API key and host URLs in `.env`
-- Check that indexes are created (run the script first)
-- Ensure index names match in your `.env` file
-
-### Empty Streaming Response
-
-Make sure you're using proper SSE-compatible client (curl with `-N` flag or proper JavaScript EventSource)
 
 ## License
 
