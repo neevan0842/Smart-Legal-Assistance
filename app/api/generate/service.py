@@ -3,6 +3,8 @@ from typing import AsyncGenerator, Tuple
 from fastapi import Request
 from ...core.config import settings
 
+NAMESPACE = "legal_law_documents"
+
 
 def _merge_chunks(h1, h2):
     """Get the unique hits from two search results and return them as single array."""
@@ -57,11 +59,11 @@ async def _retrieve_and_rerank(
     # Run both searches concurrently
     dense_response, sparse_response = await asyncio.gather(
         async_dense_index.search_records(
-            namespace="bns_and_bnss",
+            namespace=NAMESPACE,
             query={"top_k": top_k, "inputs": {"text": query}},
         ),
         async_sparse_index.search_records(
-            namespace="bns_and_bnss",
+            namespace=NAMESPACE,
             query={"top_k": top_k, "inputs": {"text": query}},
         ),
     )
