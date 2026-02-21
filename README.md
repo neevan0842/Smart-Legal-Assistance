@@ -67,6 +67,15 @@ LLM_MODEL_NAME=llama-3.3-70b-versatile
 
 # FRONTEND CONFIGURATION
 FRONTEND_URLS=http://localhost:3000
+
+# Database Configuration
+POSTGRES_USER=your_postgres_user
+POSTGRES_PASSWORD=your_postgres_password
+POSTGRES_DB=your_database_name
+POSTGRES_PORT=5432
+POSTGRES_HOST=localhost
+DATABASE_URL_SYNC=postgres://your_postgres_user:your_postgres_password@localhost:5432/your_database_name
+DATABASE_URL_ASYNC=postgresql+asyncpg://your_postgres_user:your_postgres_password@localhost:5432/your_database_name
 ```
 
 #### Where to Find API Keys:
@@ -90,14 +99,26 @@ FRONTEND_URLS=http://localhost:3000
 uv sync
 ```
 
-### 5. Place Legal Documents
+### 5. Database Migration (Alembic)
+
+Run the following commands to set up and apply database migrations:
+
+```bash
+# Create a new migration (after changing models)
+uv run alembic revision --autogenerate -m "your message here"
+
+# Apply migrations to the database
+uv run alembic upgrade head
+```
+
+### 6. Place Legal Documents
 
 Add your PDF documents to `scripts/documents/`:
 
 - `BNS.pdf` - Bharatiya Nyaya Sanhita
 - `BNSS.pdf` - Bharatiya Nagarik Suraksha Sanhita
 
-### 6. Populate Pinecone Database
+### 7. Populate Pinecone Database
 
 Run the script to extract sections from PDFs and upload to Pinecone:
 
@@ -105,7 +126,7 @@ Run the script to extract sections from PDFs and upload to Pinecone:
 uv run -m scripts.pinecone_seeding
 ```
 
-### 7. Start the Server
+### 8. Start the Server
 
 **Development mode with auto-reload:**
 
@@ -135,6 +156,13 @@ Smart-Legal-Assistance/
 ├── LICENSE
 ├── pyproject.toml              # Project dependencies
 ├── README.md
+├── .env                        # Environment variables (create from .env.sample)
+├── .env.sample                 # Environment template
+├── .gitignore
+├── .python-version
+├── docker-compose.yml
+├── alembic.ini
+├── uv.lock
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
@@ -144,22 +172,47 @@ Smart-Legal-Assistance/
 │   │       ├── __init__.py
 │   │       ├── api.py          # Route handlers
 │   │       ├── schema.py       # Pydantic models
-│   │       └── service.py      # Business logic
+│   │       ├── service.py      # Business logic
 │   ├── core/
 │   │   ├── __init__.py
-│   │   └── config.py           # Settings management
-│   └── middlewares/
+│   │   ├── config.py           # Settings management
+│   │   ├── constants.py
+│   │   ├── dependencies.py
+│   │   └── logger.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── session.py
+│   │   └── models/
+│   │       ├── __init__.py
+│   │       ├── chat.py
+│   │       ├── document.py
+│   │       ├── evaluation.py
+│   │       └── user.py
+│   ├── middlewares/
+│   │   ├── __init__.py
+│   │   └── logger.py           # Logging & security headers
+│   └── utils/
 │       ├── __init__.py
-│       └── logger.py           # Logging & security headers
+│       ├── groq.py
+│       ├── pinecone.py
+│       └── utils.py
 ├── scripts/
-│   ├── __init__.py
-│   ├── bns_bnss_to_pinecone.py # Data ingestion script
+│   ├── extraction.py
+│   ├── pinecone_seeding.py
 │   ├── query.ipynb             # Query notebook
-│   ├── utils.py                # Helper functions
-│   └── contents/               # Extracted sections (auto-generated)
+│   ├── contents/
+│   │   ├── bns_and_bnss.json
+│   │   ├── bns.json
+│   │   └── bnss.json
 │   └── documents/              # Place PDFs here
-└── .env                        # Environment variables (create from .env.sample)
-└── .env.sample                 # Environment template
+├── alembic/
+│   ├── env.py
+│   ├── README
+│   ├── script.py.mako
+│   └── versions/
+│       └── 7e5e8ebfa7a0_initial_migration.py
+└── .venv/                      # Python virtual environment (not committed)
 ```
 
 ## Development
