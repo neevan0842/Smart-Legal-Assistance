@@ -39,7 +39,9 @@ class ChatMessage(Base):
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("chat_sessions.id"), nullable=False
     )
-    role: Mapped[str] = mapped_column(String(10), nullable=False)
+    role: Mapped[str] = mapped_column(
+        String(10), nullable=False
+    )  # TODO: change to literal
     content: Mapped[str] = mapped_column(String, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(

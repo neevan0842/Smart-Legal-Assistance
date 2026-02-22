@@ -15,3 +15,14 @@ class ChatSessionResponse(BaseModel):
 
 class UpdateChatSessionTitleRequest(BaseModel):
     title: str = Field(..., description="The new title for the chat session")
+
+
+class ChatMessageResponse(BaseModel):
+    id: UUID
+    session_id: UUID
+    role: str  # TODO: change to literal
+    content: str
+    created_at: datetime
+    ndcg_score: Optional[float] = None
+
+    model_config = ConfigDict(from_attributes=True)
