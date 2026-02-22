@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
+from app.core.constants import ChatRole
 
 
 class ChatSessionResponse(BaseModel):
@@ -20,7 +21,7 @@ class UpdateChatSessionTitleRequest(BaseModel):
 class ChatMessageResponse(BaseModel):
     id: UUID
     session_id: UUID
-    role: str  # TODO: change to literal
+    role: ChatRole
     content: str
     created_at: datetime
     ndcg_score: Optional[float] = None

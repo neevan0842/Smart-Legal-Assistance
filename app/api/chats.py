@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.constants import ChatRole
 from app.core.dependencies import get_db
 from app.db.models.chat import ChatMessage, ChatSession
 from app.db.models.user import User
@@ -48,7 +49,7 @@ async def create_new_chat_session(
     await db.refresh(new_chat)
     new_message = ChatMessage(
         session_id=new_chat.id,
-        role="system",  # TODO:change to literal
+        role=ChatRole.ASSISTANT,
         content="Hello! How can I assist you today?",
     )
     db.add(new_message)
