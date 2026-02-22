@@ -17,3 +17,12 @@ class UserRegister(BaseModel):
     email: EmailStr = Field(..., description="The email address of the user")
     full_name: Optional[str] = Field(None, description="The full name of the user")
     password: str = Field(..., min_length=8, description="The password for the user")
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    user_id: Optional[str] = None
