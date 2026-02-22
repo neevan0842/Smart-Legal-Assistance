@@ -76,6 +76,12 @@ POSTGRES_PORT=5432
 POSTGRES_HOST=localhost
 DATABASE_URL_SYNC=postgres://your_postgres_user:your_postgres_password@localhost:5432/your_database_name
 DATABASE_URL_ASYNC=postgresql+asyncpg://your_postgres_user:your_postgres_password@localhost:5432/your_database_name
+
+# JWT Configuration
+DUMMY_HASH=dummy_hash_for_timing_attack_prevention
+JWT_SECRET_KEY=your_jwt_secret_key
+JWT_ALGORITHM=jwt_algorithm
+JWT_ACCESS_TOKEN_EXPIRE_MINUTES=jwt_access_token_expire_minutes
 ```
 
 #### Where to Find API Keys:
@@ -158,12 +164,14 @@ Smart-Legal-Assistance/
 ├── README.md
 ├── alembic.ini
 ├── docker-compose.yml
+├── .env.sample
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── generate.py
+│   │   ├── users.py
 │   ├── core/
 │   │   ├── __init__.py
 │   │   ├── config.py           # Settings management
@@ -186,9 +194,11 @@ Smart-Legal-Assistance/
 │   ├── schema/
 │   │   ├── __init__.py
 │   │   ├── generate.py
+│   │   ├── users.py
 │   ├── service/
 │   │   ├── __init__.py
 │   │   ├── generate.py
+│   │   ├── users.py
 │   ├── utils/
 │   │   ├── __init__.py
 │   │   ├── groq.py
@@ -208,7 +218,6 @@ Smart-Legal-Assistance/
 │   ├── README
 │   ├── script.py.mako
 │   ├── versions/
-│   │   ├── 7e5e8ebfa7a0_initial_migration.py
 └── .venv/                      # Python virtual environment
 ```
 
