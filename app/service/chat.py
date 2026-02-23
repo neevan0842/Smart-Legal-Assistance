@@ -12,9 +12,7 @@ async def get_chat_messages_with_score(
 ) -> List[ChatMessageResponse]:
     stmt = (
         select(ChatMessage, MessageEvaluation.ndcg_score)
-        .outerjoin(
-            MessageEvaluation, ChatMessage.id == MessageEvaluation.chat_message_id
-        )
+        .outerjoin(MessageEvaluation, ChatMessage.id == MessageEvaluation.message_id)
         .where(ChatMessage.session_id == chat_id)
         .order_by(ChatMessage.created_at.asc())
     )

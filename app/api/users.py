@@ -83,3 +83,13 @@ async def read_user_by_id(
             detail="User not found",
         )
     return user
+
+
+@router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_current_user(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete the current authenticated user"""
+    await db.delete(current_user)
+    await db.commit()

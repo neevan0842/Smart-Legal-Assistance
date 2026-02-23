@@ -12,7 +12,8 @@ from app.schema.users import TokenData
 from fastapi.security import OAuth2PasswordBearer
 
 password_hash = PasswordHash.recommended()
-DUMMY_HASH = settings.DUMMY_HASH  # Dummy hash for timing attack prevention
+# Dummy hash for timing attack prevention
+DUMMY_HASH = password_hash.hash(settings.DUMMY_HASH)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/users/login")
 JWT_SECRET_KEY = settings.JWT_SECRET_KEY
 JWT_ALGORITHM = settings.JWT_ALGORITHM
