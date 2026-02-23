@@ -106,7 +106,11 @@ class PineconeService:
             return [False] * len(index_names)
 
     async def upsert_records(
-        self, records: List[dict], semaphore: int = 5, max_batch_size: int = 96
+        self,
+        records: List[dict],
+        semaphore: int = 5,
+        max_batch_size: int = 96,
+        namespace: str = NAMESPACE,
     ):
         sem = asyncio.Semaphore(semaphore)
 
@@ -115,7 +119,7 @@ class PineconeService:
 
             async def bounded_upsert(i, index, records, index_name):
                 async with sem:
-                    await index.upsert_records(NAMESPACE, records)
+                    await index.upsert_records(namespace, records)
                     logger.info(
                         f"Upserted batch {i+1} out of {total_batches} records into {index_name}."
                     )
@@ -140,13 +144,13 @@ class PineconeService:
             logger.error(f"Error upserting records: {e}")
 
     async def query_and_rerank(
-        self, query: str, top_k: int = 20, top_n: int = 10
+        self, query: str, top_k: int = 20, top_n: int = 10, namespace: str = NAMESPACE
     ) -> str:
         """Queries both dense and sparse indexes concurrently, merges results, and reranks them using Pinecone's inference API."""
         # Query both indexes concurrently
         dense_response, sparse_response = await asyncio.gather(
-            self._query_dense_index_async(query, top_k),
-            self._query_sparse_index_async(query, top_k),
+            self._query_dense_index_async(query, top_k, namespace=namespace),
+            self._query_sparse_index_async(query, top_k, namespace=namespace),
         )
 
         # Merge results
@@ -194,22 +198,26 @@ class PineconeService:
         ]
         return result
 
-    async def _query_dense_index_async(self, query: str, top_k: int = 15) -> dict:
+    async def _query_dense_index_async(
+        self, query: str, top_k: int = 15, namespace: str = NAMESPACE
+    ) -> dict:
         """Query the dense index asynchronously."""
         try:
             return await self.async_dense_index.search_records(
-                namespace=NAMESPACE,
+                namespace=namespace,
                 query={"top_k": top_k, "inputs": {"text": query}},
             )
         except Exception as e:
             logger.error(f"Error querying dense index: {e}")
             return {"result": {"hits": []}}
 
-    async def _query_sparse_index_async(self, query: str, top_k: int = 15):
+    async def _query_sparse_index_async(
+        self, query: str, top_k: int = 15, namespace: str = NAMESPACE
+    ) -> dict:
         """Query the sparse index asynchronously."""
         try:
             return await self.async_sparse_index.search_records(
-                namespace=NAMESPACE,
+                namespace=namespace,
                 query={"top_k": top_k, "inputs": {"text": query}},
             )
         except Exception as e:
