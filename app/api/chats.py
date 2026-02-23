@@ -20,11 +20,11 @@ router = APIRouter(prefix="/chats", tags=["chats"])
 
 
 @router.get("/", response_model=List[ChatSessionResponse])
-async def get_all_user_chats(
+async def get_all_user_chats_sessions(
     user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Endpoint to retrieve the list of chats for the authenticated user."""
+    """Endpoint to retrieve all chat sessions for the authenticated user, ordered by creation date (most recent first)."""
     stmt = (
         select(ChatSession)
         .where(ChatSession.user_id == user.id)
@@ -102,7 +102,7 @@ async def delete_chat_session(
 
 
 @router.get("/{chat_id}/messages", response_model=List[ChatMessageResponse])
-async def get_chat_messages_by_chat_id(
+async def get_chat_messages_by_chat_session_id(
     chat_id: UUID,
     user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
