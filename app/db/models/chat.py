@@ -49,7 +49,13 @@ class ChatMessage(Base):
         TIMESTAMP(timezone=True), server_default=func.now()
     )
 
+    message_documents = relationship(
+        "MessageDocument", back_populates="message", cascade="all, delete"
+    )
     session = relationship("ChatSession", back_populates="messages")
+    evaluations = relationship(
+        "MessageEvaluation", back_populates="message", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<ChatMessage(id={self.id}, role={self.role})>"

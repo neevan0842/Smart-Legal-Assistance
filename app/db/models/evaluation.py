@@ -12,7 +12,7 @@ class MessageEvaluation(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    chat_message_id: Mapped[uuid.UUID] = mapped_column(
+    message_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("chat_messages.id"), nullable=False
     )
     ndcg_score: Mapped[float | None] = mapped_column(Float)
@@ -21,7 +21,7 @@ class MessageEvaluation(Base):
         TIMESTAMP(timezone=True), server_default=func.now()
     )
 
-    message = relationship("ChatMessage", backref="evaluations")
+    message = relationship("ChatMessage", back_populates="evaluations")
 
     def __repr__(self) -> str:
-        return f"<MessageEvaluation(id={self.id}, chat_message_id={self.chat_message_id}, ndcg_score={self.ndcg_score})>"
+        return f"<MessageEvaluation(id={self.id}, message_id={self.message_id}, ndcg_score={self.ndcg_score})>"
