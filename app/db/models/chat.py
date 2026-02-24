@@ -26,6 +26,9 @@ class ChatSession(Base):
     messages = relationship(
         "ChatMessage", back_populates="session", cascade="all, delete"
     )
+    documents = relationship(
+        "Document", back_populates="chat_session", cascade="all, delete"
+    )
 
     def __repr__(self) -> str:
         return f"<ChatSession(id={self.id}, title={self.title})>"

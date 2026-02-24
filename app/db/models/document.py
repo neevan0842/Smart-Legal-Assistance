@@ -41,6 +41,9 @@ class Document(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
+    chat_session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("chat_sessions.id"), nullable=True
+    )
     source_type: Mapped[DocumentSourceType] = mapped_column(
         Enum(DocumentSourceType, native_enum=True), nullable=False
     )
@@ -52,6 +55,7 @@ class Document(Base):
     )
 
     user = relationship("User", back_populates="documents")
+    chat_session = relationship("ChatSession", back_populates="documents")
     message_documents = relationship(
         "MessageDocument", back_populates="document", cascade="all, delete"
     )
