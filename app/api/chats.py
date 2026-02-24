@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.constants import ChatRole
-from app.core.dependencies import get_db
+from app.core.dependencies import get_db, get_pinecone_service
 from app.db.models.chat import ChatMessage, ChatSession
 from app.db.models.user import User
 from app.schema.chats import (
@@ -13,7 +13,9 @@ from app.schema.chats import (
     UpdateChatSessionTitleRequest,
 )
 from app.service.chat import get_chat_messages_with_score
+from app.service.documents import delete_all_documents_from_storage_by_chat_session_id
 from app.service.users import get_current_active_user
+from app.utils.pinecone import PineconeService
 
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -41,12 +43,17 @@ async def get_all_user_chats_sessions(
 async def create_new_chat_session(
     user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
+    pc_svc: PineconeService = Depends(get_pinecone_service),
 ):
     """Endpoint to create a new chat session for the authenticated user."""
     new_chat = ChatSession(user_id=user.id)
     db.add(new_chat)
     await db.commit()
     await db.refresh(new_chat)
+
+    # create a namespace in Pinecone
+    await pc_svc.create_pinecone_namespace(namespace=str(new_chat.id))
+
     new_message = ChatMessage(
         session_id=new_chat.id,
         role=ChatRole.ASSISTANT,
@@ -85,6 +92,7 @@ async def delete_chat_session(
     chat_id: UUID,
     user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
+    pc_svc: PineconeService = Depends(get_pinecone_service),
 ):
     """Endpoint to delete a chat session for the authenticated user."""
     stmt = select(ChatSession).where(
@@ -96,6 +104,13 @@ async def delete_chat_session(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found"
         )
+
+    # delete all associated namespace in Pinecone vector database and storage
+    await pc_svc.delete_pinecone_namespace(namespace=str(chat_session.id))
+    await delete_all_documents_from_storage_by_chat_session_id(
+        chat_session_id=str(chat_session.id), db=db
+    )
+
     await db.delete(chat_session)
     await db.commit()
     return None

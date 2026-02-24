@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from app.utils.groq import GroqService
 from app.utils.pinecone import PineconeService
 from app.core.config import settings
-from app.api import generate, users, chats
+from app.api import documents, generate, users, chats
 from app.middlewares.logger import LoggingMiddleware
 
 FRONTEND_URLS = settings.FRONTEND_URLS
@@ -39,6 +39,7 @@ app.add_middleware(LoggingMiddleware)
 app.include_router(router=generate.router, prefix="/api")
 app.include_router(router=users.router, prefix="/api")
 app.include_router(router=chats.router, prefix="/api")
+app.include_router(router=documents.router, prefix="/api")
 
 
 # Root route

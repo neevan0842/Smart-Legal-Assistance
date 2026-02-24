@@ -143,6 +143,96 @@ class PineconeService:
         except Exception as e:
             logger.error(f"Error upserting records: {e}")
 
+    async def create_pinecone_namespace(self, namespace: str) -> bool:
+        """Create a namespace in both indexes if it doesn't already exist."""
+        if not namespace:
+            logger.error("Namespace is required for creation.")
+            return False
+
+        async def create_namespace_in_sparse_index() -> bool:
+            try:
+                await self.async_sparse_index.create_namespace(name=namespace)
+                return True
+            except Exception as e:
+                logger.error(f"Error creating namespace in sparse index: {e}")
+                return False
+
+        async def create_namespace_in_dense_index() -> bool:
+            try:
+                await self.async_dense_index.create_namespace(name=namespace)
+                return True
+            except Exception as e:
+                logger.error(f"Error creating namespace in dense index: {e}")
+                return False
+
+        results = await asyncio.gather(
+            create_namespace_in_sparse_index(), create_namespace_in_dense_index()
+        )
+        logger.info(f"Create namespace results: {results}")
+        return all(results)
+
+    async def delete_document_records_by_metadata(
+        self, document_id: str, namespace: str
+    ) -> bool:
+        """Delete records from both indexes based on document_id in metadata."""
+        if not document_id or not namespace:
+            logger.error("Document ID and namespace are required for deletion.")
+            return False
+
+        async def delete_records_from_sparse_index() -> bool:
+            try:
+                await self.async_sparse_index.delete(
+                    filter={"document_id": {"$eq": document_id}}, namespace=namespace
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting records from sparse index: {e}")
+                return False
+
+        async def delete_records_from_dense_index() -> bool:
+            try:
+                await self.async_dense_index.delete(
+                    filter={"document_id": {"$eq": document_id}}, namespace=namespace
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting records from dense index: {e}")
+                return False
+
+        results = await asyncio.gather(
+            delete_records_from_sparse_index(), delete_records_from_dense_index()
+        )
+        logger.info(f"Delete results: {results}")
+        return all(results)
+
+    async def delete_pinecone_namespace(self, namespace: str) -> bool:
+        """Delete an entire namespace from both indexes."""
+        if not namespace:
+            logger.error("Namespace is required for deletion.")
+            return False
+
+        async def delete_namespace_from_sparse_index() -> bool:
+            try:
+                await self.async_sparse_index.delete_namespace(namespace=namespace)
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting namespace from sparse index: {e}")
+                return False
+
+        async def delete_namespace_from_dense_index() -> bool:
+            try:
+                await self.async_dense_index.delete_namespace(namespace=namespace)
+                return True
+            except Exception as e:
+                logger.error(f"Error deleting namespace from dense index: {e}")
+                return False
+
+        results = await asyncio.gather(
+            delete_namespace_from_sparse_index(), delete_namespace_from_dense_index()
+        )
+        logger.info(f"Delete namespace results: {results}")
+        return all(results)
+
     async def query_and_rerank(
         self, query: str, top_k: int = 20, top_n: int = 10, namespace: str = NAMESPACE
     ) -> str:
