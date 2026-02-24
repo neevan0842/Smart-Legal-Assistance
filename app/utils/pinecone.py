@@ -121,7 +121,7 @@ class PineconeService:
                 async with sem:
                     await index.upsert_records(namespace, records)
                     logger.info(
-                        f"Upserted batch {i+1} out of {total_batches} records into {index_name}."
+                        f"Upserted batch {i+1}/{total_batches} into {index_name} (namespace: {namespace})"
                     )
 
             tasks = [

@@ -3,7 +3,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.utils.pinecone import PineconeService
 from app.core.logger import logger
-from app.utils.utils import chunk_long_sections, save_as_json
+from app.utils.utils import save_as_json
 from scripts.extraction import extract_bns, extract_bnss
 
 
@@ -28,8 +28,7 @@ bnss = extract_bnss(bnss_path.as_posix())
 save_as_json(bnss, output_dir / "bnss.json")
 logger.info(f"Extracted BNSS sections and saved to JSON with {len(bnss)} sections.")
 
-# Chunk sections that are too large for Pinecone metadata limits
-bns_and_bnss = chunk_long_sections(bns + bnss)
+bns_and_bnss = bns + bnss
 save_as_json(bns_and_bnss, output_dir / "bns_and_bnss.json")
 logger.info(f"bns_and_bnss saved to JSON with {len(bns_and_bnss)} sections.")
 
