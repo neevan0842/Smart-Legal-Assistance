@@ -1,3 +1,5 @@
+import asyncio
+from typing import List
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.constants import USER_UPLOADS_DIR, DocumentSourceType
@@ -8,6 +10,26 @@ from app.utils.pinecone import PineconeService
 from app.utils.utils import PDFLoader, split_text_to_chunks
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
+
+
+async def handle_multiple_file_uploads(
+    files: List[UploadFile],
+    current_user: User,
+    chat_session_id: str,
+    db: AsyncSession,
+    pc_svc: PineconeService,
+) -> List[Document]:
+    documents = []
+    for file in files:
+        document = await save_uploaded_file(file, current_user, chat_session_id, db)
+        documents.append(document)
+
+    tasks = [
+        upsert_document_to_pinecone(document, chat_session_id, pc_svc)
+        for document in documents
+    ]
+    await asyncio.gather(*tasks)
+    return documents
 
 
 async def save_uploaded_file(

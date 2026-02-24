@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, List
 from app.core.logger import logger
 from groq import AsyncGroq
 from app.core.config import settings
@@ -27,31 +27,25 @@ class GroqService:
             await self.groq_client.close()
         logger.info("Groq client closed successfully.")
 
-    async def generate_answer(self, query: str, system_prompt: str) -> str:
+    async def generate_answer(self, prompt_messages: List[dict]) -> str:
         """Generate an answer for a legal query using the provided context and system prompt."""
 
         chat_completion = await self.groq_client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": query},
-            ],
+            messages=prompt_messages,
             model=LLM_MODEL_NAME,
         )
 
         return chat_completion.choices[0].message.content
 
     async def generate_answer_stream(
-        self, query: str, system_prompt: str
+        self, prompt_messages: List[dict]
     ) -> AsyncGenerator[str, None]:
         """Generate an answer for a legal query using the provided context and system prompt with streaming."""
 
         # Get streaming response from LLM
         stream = await self.groq_client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": query},
-            ],
-            model=settings.LLM_MODEL_NAME,
+            messages=prompt_messages,
+            model=LLM_MODEL_NAME,
             stream=True,
         )
 

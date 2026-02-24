@@ -9,6 +9,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "fastapi[standard]>=0.127.0",
     "groq>=1.0.0",
+    "langchain>=1.2.10",
     "langchain-text-splitters>=1.1.1",
     "pinecone[asyncio,grpc]>=8.0.0",
     "pwdlib[argon2]>=0.3.0",

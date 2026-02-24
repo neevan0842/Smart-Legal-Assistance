@@ -1,20 +1,28 @@
-from typing import List
+import asyncio
+from typing import List, Optional
+
+# from app.core.logger import logger
 from uuid import UUID
 from sqlalchemy.future import select
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.constants import ChatRole
-from app.core.dependencies import get_db, get_pinecone_service
+from app.core.constants import NAMESPACE, ChatRole
+from app.core.dependencies import get_db, get_groq_service, get_pinecone_service
 from app.db.models.chat import ChatMessage, ChatSession
+from app.db.models.document import MessageDocument
 from app.db.models.user import User
 from app.schema.chats import (
     ChatMessageResponse,
     ChatSessionResponse,
     UpdateChatSessionTitleRequest,
 )
-from app.service.chat import get_chat_messages_with_score
-from app.service.documents import delete_all_documents_from_storage_by_chat_session_id
+from app.service.chat import construct_prompt, get_chat_messages_with_score
+from app.service.documents import (
+    delete_all_documents_from_storage_by_chat_session_id,
+    handle_multiple_file_uploads,
+)
 from app.service.users import get_current_active_user
+from app.utils.groq import GroqService
 from app.utils.pinecone import PineconeService
 
 
@@ -137,3 +145,92 @@ async def get_chat_messages_by_chat_session_id(
     # Retrieve messages for the chat session
     messages = await get_chat_messages_with_score(chat_id=chat_id, db=db)
     return messages
+
+
+@router.post("/{chat_id}/messages", response_model=ChatMessageResponse)
+async def add_message_to_chat_session_and_generate_llm_response(
+    chat_id: UUID,
+    query: str = Form(...),
+    files: Optional[List[UploadFile]] = File([]),
+    user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+    pc_svc: PineconeService = Depends(get_pinecone_service),
+    groq_svc: GroqService = Depends(get_groq_service),
+):
+    """Endpoint to add a new message to a specific chat session and generate an LLM response."""
+    # verify files are pdfs
+    for doc in files:
+        if doc.content_type != "application/pdf":
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Unsupported file type: {doc.filename}. Only PDF files are allowed.",
+            )
+
+    # Verify that the chat session exists and belongs to the user
+    stmt = select(ChatSession).where(
+        ChatSession.id == chat_id, ChatSession.user_id == user.id
+    )
+    result = await db.execute(stmt)
+    chat_session = result.scalar_one_or_none()
+    if chat_session is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Chat session not found"
+        )
+
+    # Handle uploaded files
+    documents = await handle_multiple_file_uploads(
+        files, user, str(chat_id), db, pc_svc
+    )
+
+    # Add user's message to the chat session
+    user_message = ChatMessage(session_id=chat_id, role=ChatRole.USER, content=query)
+    db.add(user_message)
+    await db.commit()
+    await db.refresh(user_message)
+
+    # Associate uploaded documents with the user's message
+    message_documents = []
+    for document in documents:
+        message_document = MessageDocument(
+            message_id=user_message.id, document_id=document.id
+        )
+        message_documents.append(message_document)
+    db.add_all(message_documents)
+    await db.commit()
+
+    tasks = [
+        pc_svc.query_index_and_merge(query=query, top_k=15, namespace=str(chat_id)),
+        pc_svc.query_index_and_merge(query=query, top_k=15, namespace=NAMESPACE),
+    ]
+    user_session_results, global_results = await asyncio.gather(*tasks)
+
+    context = await pc_svc.rerank_merged_records_and_get_context(
+        query=query, merged_results=user_session_results + global_results
+    )
+
+    # TODO do the evaluation here and get the score, then save it to the database
+
+    prompt_messages = await construct_prompt(
+        query=query, context=context, chat_id=chat_id, db=db
+    )
+
+    # logger.info(f"Constructed prompt for Groq: {prompt_messages}")
+
+    ai_message_content = await groq_svc.generate_answer(prompt_messages=prompt_messages)
+
+    ai_message = ChatMessage(
+        session_id=chat_id, role=ChatRole.ASSISTANT, content=ai_message_content
+    )
+    db.add(ai_message)
+    await db.commit()
+    await db.refresh(ai_message)
+
+    return ChatMessageResponse(
+        id=ai_message.id,
+        session_id=ai_message.session_id,
+        role=ai_message.role,
+        content=ai_message.content,
+        created_at=ai_message.created_at,
+        ndcg_score=None,
+        documents=documents,
+    )

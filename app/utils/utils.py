@@ -1,3 +1,4 @@
+from langchain_core.messages import BaseMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import json
 import fitz
@@ -29,6 +30,28 @@ def split_text_to_chunks(text: str) -> list[str]:
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=400)
     chunks = text_splitter.split_text(text)
     return chunks
+
+
+def base_messages_to_groq(messages: list[BaseMessage]) -> list[dict]:
+    """
+    Convert LangChain BaseMessage objects to a list of dicts
+    compatible with Groq's chat API (role must be 'system', 'user', or 'assistant').
+    """
+    groq_msgs = []
+
+    for msg in messages:
+        # Determine the correct role mapping
+        if msg.type == "system":
+            role = "system"
+        elif msg.type == "human" or msg.type == "user":
+            role = "user"
+        else:
+            # Map all LangChain assistant/AI roles to "assistant"
+            role = "assistant"
+
+        groq_msgs.append({"role": role, "content": msg.content})
+
+    return groq_msgs
 
 
 class PDFLoader:

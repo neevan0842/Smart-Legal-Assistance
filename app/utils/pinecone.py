@@ -1,5 +1,5 @@
 import asyncio
-from typing import List
+from typing import Dict, List
 from pinecone import PineconeAsyncio
 from app.core.constants import NAMESPACE
 from app.core.logger import logger
@@ -233,18 +233,13 @@ class PineconeService:
         logger.info(f"Delete namespace results: {results}")
         return all(results)
 
-    async def query_and_rerank(
-        self, query: str, top_k: int = 20, top_n: int = 10, namespace: str = NAMESPACE
+    async def rerank_merged_records_and_get_context(
+        self,
+        query: str,
+        merged_results: List[Dict],
+        top_n: int = 10,
     ) -> str:
         """Queries both dense and sparse indexes concurrently, merges results, and reranks them using Pinecone's inference API."""
-        # Query both indexes concurrently
-        dense_response, sparse_response = await asyncio.gather(
-            self._query_dense_index_async(query, top_k, namespace=namespace),
-            self._query_sparse_index_async(query, top_k, namespace=namespace),
-        )
-
-        # Merge results
-        merged_results = self._merge_chunks(dense_response, sparse_response)
 
         # Rerank results
         reranked_result = await self.pc_async.inference.rerank(
@@ -258,14 +253,33 @@ class PineconeService:
         )
 
         # Format the combined context for the LLM prompt
-        combined_context = "\n\n".join(
-            f"{hit['document']['_id'].split('_')[0]} - Section {int(hit['document']['metadata']['section_number'])} - {hit['document']['content']}"
-            for hit in reranked_result.data
-        )
+        context = []
+        for hit in reranked_result.data:
+            content = hit["document"]["content"]
+            section_number = hit["document"].get("metadata", {}).get("section_number")
+            context.append(
+                f"Section {section_number} - content: {content}"
+                if section_number
+                else f"Content: {content}"
+            )
+        combined_context = "\n\n".join(context)
 
         return combined_context
 
-    def _merge_chunks(self, h1, h2):
+    async def query_index_and_merge(
+        self, query: str, top_k: int = 15, namespace: str = NAMESPACE
+    ) -> List[Dict]:
+        """Query both indexes concurrently and merge results without reranking."""
+        dense_response, sparse_response = await asyncio.gather(
+            self._query_dense_index_async(query, top_k, namespace=namespace),
+            self._query_sparse_index_async(query, top_k, namespace=namespace),
+        )
+
+        # Merge results
+        merged_results = self._merge_chunks(dense_response, sparse_response)
+        return merged_results
+
+    def _merge_chunks(self, h1, h2) -> List[Dict]:
         """Get the unique hits from two search results and return them as single array of {'_id', 'chunk_text'} dicts, printing each dict on a new line."""
         # Deduplicate by _id
         deduped_hits = {
@@ -279,9 +293,7 @@ class PineconeService:
                 "_id": hit["_id"],
                 "content": hit["fields"]["content"],
                 "metadata": {
-                    "chunk": hit["fields"]["chunk"],
-                    "is_chunked": hit["fields"]["is_chunked"],
-                    "section_number": hit["fields"]["section_number"],
+                    "section_number": hit["fields"].get("section_number"),
                 },
             }
             for hit in sorted_hits
