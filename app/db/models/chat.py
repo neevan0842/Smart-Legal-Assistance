@@ -46,7 +46,7 @@ class ChatMessage(Base):
     role: Mapped[ChatRole] = mapped_column(
         Enum(ChatRole, native_enum=True), nullable=False
     )
-    content: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(String, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.now()
