@@ -23,12 +23,16 @@ def create_system_message(context: str) -> str:
     \n\n<context>\n{context.strip()}\n</context>"""
 
 
-def split_text_to_chunks(text: str) -> list[str]:
+def split_text_to_chunks(
+    text: str, chunk_size: int = 2000, chunk_overlap: int = 400
+) -> list[str]:
     """
     Split a large body of text into chunks with overlap
     so semantic context is preserved.
     """
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=400)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size, chunk_overlap=chunk_overlap
+    )
     chunks = text_splitter.split_text(text)
     return chunks
 

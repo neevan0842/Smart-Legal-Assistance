@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # GROQ CONFIGURATION
     GROQ_API_KEY: str
     LLM_MODEL_NAME: str
-    EVALUATION_MODEL_NAME: str
+    STRUCTURED_RESPONSE_MODEL: str
 
     # FRONTEND CONFIGURATION
     FRONTEND_URLS: str

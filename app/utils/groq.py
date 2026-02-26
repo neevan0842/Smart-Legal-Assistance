@@ -1,6 +1,8 @@
+import asyncio
 import json
-from typing import AsyncGenerator, List
-from pydantic import BaseModel
+from typing import AsyncGenerator, List, Type
+from pydantic import BaseModel, ConfigDict
+from groq import RateLimitError
 from app.core.logger import logger
 from groq import AsyncGroq
 from app.core.config import settings
@@ -8,11 +10,13 @@ from app.utils.utils import parse_relevance_score
 
 LLM_MODEL_NAME = settings.LLM_MODEL_NAME
 GROQ_API_KEY = settings.GROQ_API_KEY
-EVALUATION_MODEL_NAME = settings.EVALUATION_MODEL_NAME
+STRUCTURED_RESPONSE_MODEL = settings.STRUCTURED_RESPONSE_MODEL
 
 
 class RelavenceScore(BaseModel):
     score: List[int]
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class GroqService:
@@ -137,7 +141,7 @@ Retrieved documents:
 """
 
         response = await self.groq_client.chat.completions.create(
-            model=EVALUATION_MODEL_NAME,
+            model=STRUCTURED_RESPONSE_MODEL,
             messages=[
                 {
                     "role": "system",
@@ -147,6 +151,7 @@ Retrieved documents:
             ],
             response_format={
                 "type": "json_schema",
+                "strict": True,
                 "json_schema": {
                     "name": "RelevanceScore",
                     "schema": RelavenceScore.model_json_schema(),
@@ -159,3 +164,37 @@ Retrieved documents:
         parsed_scores = parse_relevance_score(result.score)
         logger.debug(f"Raw response from Groq relevance evaluation: {raw_result}")
         return parsed_scores
+
+    async def document_analysis_llm_response(
+        self, messages: List[dict], schema_model: Type
+    ):
+        max_attempts = 3
+        last_exception = None
+        for attempt in range(max_attempts):
+            try:
+                response = await self.groq_client.chat.completions.create(
+                    model=STRUCTURED_RESPONSE_MODEL,
+                    messages=messages,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "strict": True,
+                            "name": schema_model.__name__,
+                            "schema": schema_model.model_json_schema(),
+                        },
+                    },
+                )
+                return schema_model.model_validate_json(
+                    response.choices[0].message.content
+                )
+            except RateLimitError as e:
+                last_exception = e
+                logger.debug(
+                    f"Rate limit hit on attempt {attempt + 1}/{max_attempts}. Retrying after delay..."
+                )
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(10)
+            except Exception as e:
+                last_exception = e
+                break
+        raise last_exception
