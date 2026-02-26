@@ -64,6 +64,15 @@ async def analyze_document(
     return results
 
 
+@router.get("/generate")
+async def generate_new_contract(
+    _: User = Depends(get_current_active_user),
+):
+    """Endpoint to generate a new contract based on user input and predefined templates."""
+    # TODO: Implement an endpoint that generates a new contract based on user input and predefined templates.
+    pass
+
+
 @router.get("/{document_id}")
 async def download_document(
     document_id: UUID,
