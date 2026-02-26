@@ -42,13 +42,13 @@ cd Smart-Legal-Assistance
 
 ### 3. Set Up Environment Variables
 
-Copy the sample environment file:
+The project comes with a `.env.sample` file listing all required environment variables. Copy it to `.env` if not already present:
 
 ```bash
 cp .env.sample .env
 ```
 
-Edit `.env` and fill in your credentials:
+Edit the `.env` file and fill in your credentials. The following variables must be set:
 
 ```env
 # PINECONE CONFIGURATION
@@ -64,6 +64,7 @@ PINECONE_RERANKING_MODEL=bge-reranker-v2-m3
 # GROQ CONFIGURATION
 GROQ_API_KEY=your_groq_api_key_here
 LLM_MODEL_NAME=llama-3.3-70b-versatile
+STRUCTURED_RESPONSE_MODEL=openai/gpt-oss-120b
 
 # FRONTEND CONFIGURATION
 FRONTEND_URLS=http://localhost:3000
@@ -74,14 +75,17 @@ POSTGRES_PASSWORD=your_postgres_password
 POSTGRES_DB=your_database_name
 POSTGRES_PORT=5432
 POSTGRES_HOST=localhost
-DATABASE_URL_SYNC=postgres://your_postgres_user:your_postgres_password@localhost:5432/your_database_name
-DATABASE_URL_ASYNC=postgresql+asyncpg://your_postgres_user:your_postgres_password@localhost:5432/your_database_name
+DATABASE_URL_SYNC=postgres://username:password@localhost:5432/database_name
+DATABASE_URL_ASYNC=postgresql+asyncpg://username:password@localhost:5432/database_name
 
 # JWT Configuration
 DUMMY_HASH=dummy_hash_for_timing_attack_prevention
 JWT_SECRET_KEY=your_jwt_secret_key
 JWT_ALGORITHM=jwt_algorithm
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=jwt_access_token_expire_minutes
+
+# Logging Configuration
+LOG_LEVEL=DEBUG
 ```
 
 #### Where to Find API Keys:
@@ -165,12 +169,14 @@ Smart-Legal-Assistance/
 ├── alembic.ini
 ├── docker-compose.yml
 ├── .env.sample
+├── .env
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
 │   ├── api/
 │   │   ├── __init__.py
-│   │   ├── generate.py
+│   │   ├── chats.py
+│   │   ├── documents.py
 │   │   ├── users.py
 │   ├── core/
 │   │   ├── __init__.py
@@ -193,11 +199,13 @@ Smart-Legal-Assistance/
 │   │   ├── logger.py           # Logging & security headers
 │   ├── schema/
 │   │   ├── __init__.py
-│   │   ├── generate.py
+│   │   ├── chats.py
+│   │   ├── documents.py
 │   │   ├── users.py
 │   ├── service/
 │   │   ├── __init__.py
-│   │   ├── generate.py
+│   │   ├── chat.py
+│   │   ├── documents.py
 │   │   ├── users.py
 │   ├── utils/
 │   │   ├── __init__.py
@@ -213,6 +221,9 @@ Smart-Legal-Assistance/
 │   │   ├── bns.json
 │   │   ├── bnss.json
 │   ├── documents/              # Place PDFs here
+├── storage/
+│   ├── generated_docs/
+│   ├── user_uploads/
 ├── alembic/
 │   ├── env.py
 │   ├── README
