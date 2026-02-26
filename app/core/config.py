@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int
 
+    # Logging Configuration
+    LOG_LEVEL: str
+
     model_config = ConfigDict(env_file=".env")
 
 

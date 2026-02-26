@@ -1,7 +1,6 @@
 import asyncio
 from typing import List, Optional
-
-# from app.core.logger import logger
+from app.core.logger import logger
 from uuid import UUID
 from sqlalchemy.future import select
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -203,6 +202,8 @@ async def add_message_to_chat_session_and_generate_llm_response(
         pc_svc.query_index_and_merge(query=query, top_k=15, namespace=NAMESPACE),
     ]
     user_session_results, global_results = await asyncio.gather(*tasks)
+    logger.debug(f"User session results: {user_session_results}")
+    logger.debug(f"Global results: {global_results}")
 
     context = await pc_svc.rerank_merged_records_and_get_context(
         query=query, merged_results=user_session_results + global_results
@@ -214,7 +215,7 @@ async def add_message_to_chat_session_and_generate_llm_response(
         query=query, context=context, chat_id=chat_id, db=db
     )
 
-    # logger.info(f"Constructed prompt for Groq: {prompt_messages}")
+    logger.debug(f"Constructed prompt for Groq: {prompt_messages}")
 
     ai_message_content = await groq_svc.generate_answer(prompt_messages=prompt_messages)
 
