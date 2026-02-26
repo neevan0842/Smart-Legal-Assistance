@@ -11,6 +11,7 @@ from app.db.models.chat import ChatMessage, ChatSession
 from app.db.models.document import MessageDocument
 from app.db.models.user import User
 from app.schema.chats import (
+    ChatMessageAIResponse,
     ChatMessageResponse,
     ChatSessionResponse,
     UpdateChatSessionTitleRequest,
@@ -23,6 +24,7 @@ from app.service.documents import (
 from app.service.users import get_current_active_user
 from app.utils.groq import GroqService
 from app.utils.pinecone import PineconeService
+from app.utils.utils import get_ndcg_score_at_k
 
 
 router = APIRouter(prefix="/chats", tags=["chats"])
@@ -146,7 +148,7 @@ async def get_chat_messages_by_chat_session_id(
     return messages
 
 
-@router.post("/{chat_id}/messages", response_model=ChatMessageResponse)
+@router.post("/{chat_id}/messages", response_model=ChatMessageAIResponse)
 async def add_message_to_chat_session_and_generate_llm_response(
     chat_id: UUID,
     query: str = Form(...),
@@ -158,12 +160,13 @@ async def add_message_to_chat_session_and_generate_llm_response(
 ):
     """Endpoint to add a new message to a specific chat session and generate an LLM response."""
     # verify files are pdfs
-    for doc in files:
-        if doc.content_type != "application/pdf":
-            raise HTTPException(
-                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                detail=f"Unsupported file type: {doc.filename}. Only PDF files are allowed.",
-            )
+    if files is not None:
+        for doc in files:
+            if doc.content_type != "application/pdf":
+                raise HTTPException(
+                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                    detail=f"Unsupported file type: {doc.filename}. Only PDF files are allowed.",
+                )
 
     # Verify that the chat session exists and belongs to the user
     stmt = select(ChatSession).where(
@@ -177,9 +180,10 @@ async def add_message_to_chat_session_and_generate_llm_response(
         )
 
     # Handle uploaded files
-    documents = await handle_multiple_file_uploads(
-        files, user, str(chat_id), db, pc_svc
-    )
+    if files is not None and len(files) > 0:
+        documents = await handle_multiple_file_uploads(
+            files, user, str(chat_id), db, pc_svc
+        )
 
     # Add user's message to the chat session
     user_message = ChatMessage(session_id=chat_id, role=ChatRole.USER, content=query)
@@ -209,10 +213,20 @@ async def add_message_to_chat_session_and_generate_llm_response(
         query=query, merged_results=user_session_results + global_results
     )
 
-    # TODO do the evaluation here and get the score, then save it to the database
+    # get relevance score for the retrieved documents
+    relavance_score = await groq_svc.evaluate_rag_results_to_get_relevance_scores(
+        query=query, retrieved_documents=context
+    )
+    ndcg_score = get_ndcg_score_at_k(
+        relevance_scores=relavance_score, k=len(relavance_score)
+    )
+    logger.debug(f"Relevance scores: {relavance_score}")
+
+    combined_context = "\n\n".join(context)
+    logger.debug(f"Combined context for Groq: {combined_context}")
 
     prompt_messages = await construct_prompt(
-        query=query, context=context, chat_id=chat_id, db=db
+        query=query, context=combined_context, chat_id=chat_id, db=db
     )
 
     logger.debug(f"Constructed prompt for Groq: {prompt_messages}")
@@ -226,12 +240,13 @@ async def add_message_to_chat_session_and_generate_llm_response(
     await db.commit()
     await db.refresh(ai_message)
 
-    return ChatMessageResponse(
+    return ChatMessageAIResponse(
         id=ai_message.id,
         session_id=ai_message.session_id,
         role=ai_message.role,
         content=ai_message.content,
         created_at=ai_message.created_at,
-        ndcg_score=None,
+        context=context,
+        ndcg_score=ndcg_score,
         documents=documents,
     )

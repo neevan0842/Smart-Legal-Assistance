@@ -37,3 +37,7 @@ class ChatMessageResponse(BaseModel):
     documents: List[DocumentResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChatMessageAIResponse(ChatMessageResponse):
+    context: List[str] = []

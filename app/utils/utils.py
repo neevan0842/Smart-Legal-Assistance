@@ -1,3 +1,4 @@
+import math
 from langchain_core.messages import BaseMessage
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 import json
@@ -52,6 +53,49 @@ def base_messages_to_groq(messages: list[BaseMessage]) -> list[dict]:
         groq_msgs.append({"role": role, "content": msg.content})
 
     return groq_msgs
+
+
+def parse_relevance_score(raw_score):
+    """
+    Checks if the score is a single string of digits (e.g., '01001200') and converts it to a list of integers.
+    Otherwise, returns the score unchanged.
+    """
+    if isinstance(raw_score, list) and len(raw_score) == 1:
+        s = raw_score[0]
+        if isinstance(s, str) and s.isdigit():
+            return [int(c) for c in s]
+        if isinstance(s, int):
+            return [int(c) for c in str(s)]
+    return raw_score
+
+
+def get_ndcg_score_at_k(relevance_scores: list[int], k: int) -> float:
+    """
+    Calculate NDCG@k for a list of relevance scores.
+    relevance_scores: List of relevance scores for retrieved documents, ordered by rank.
+    k: The rank position to calculate NDCG at.
+    """
+    k = min(k, len(relevance_scores))
+
+    # DCG@k
+    def dcg_at_k(relevance, k):
+        k = min(k, len(relevance))
+        return sum(
+            rel / math.log2(i + 1) for i, rel in enumerate(relevance[:k], start=1)
+        )
+
+    # IDCG@k
+    def idcg_at_k(relevance, k):
+        ideal_relevance = sorted(relevance, reverse=True)
+        return dcg_at_k(ideal_relevance, k)
+
+    # NDCG@k
+    def ndcg_at_k(relevance, k):
+        dcg = dcg_at_k(relevance, k)
+        idcg = idcg_at_k(relevance, k)
+        return dcg / idcg if idcg > 0 else 0.0
+
+    return ndcg_at_k(relevance_scores, k)
 
 
 class PDFLoader:

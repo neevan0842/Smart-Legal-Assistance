@@ -238,7 +238,7 @@ class PineconeService:
         query: str,
         merged_results: List[Dict],
         top_n: int = 10,
-    ) -> str:
+    ) -> List[str]:
         """Queries both dense and sparse indexes concurrently, merges results, and reranks them using Pinecone's inference API."""
 
         # Rerank results
@@ -262,9 +262,8 @@ class PineconeService:
                 if section_number
                 else f"Content: {content}"
             )
-        combined_context = "\n\n".join(context)
 
-        return combined_context
+        return context
 
     async def query_index_and_merge(
         self, query: str, top_k: int = 15, namespace: str = NAMESPACE
