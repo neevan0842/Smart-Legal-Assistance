@@ -1,5 +1,5 @@
 import asyncio
-from typing import List, Optional
+from typing import List
 from app.core.logger import logger
 from uuid import UUID
 from sqlalchemy.future import select
@@ -9,6 +9,7 @@ from app.core.constants import NAMESPACE, ChatRole
 from app.core.dependencies import get_db, get_groq_service, get_pinecone_service
 from app.db.models.chat import ChatMessage, ChatSession
 from app.db.models.document import MessageDocument
+from app.db.models.evaluation import MessageEvaluation
 from app.db.models.user import User
 from app.schema.chats import (
     ChatMessageAIResponse,
@@ -152,7 +153,7 @@ async def get_chat_messages_by_chat_session_id(
 async def add_message_to_chat_session_and_generate_llm_response(
     chat_id: UUID,
     query: str = Form(...),
-    files: Optional[List[UploadFile]] = File([]),
+    files: List[UploadFile] = File([]),
     user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_db),
     pc_svc: PineconeService = Depends(get_pinecone_service),
@@ -160,13 +161,13 @@ async def add_message_to_chat_session_and_generate_llm_response(
 ):
     """Endpoint to add a new message to a specific chat session and generate an LLM response."""
     # verify files are pdfs
-    if files is not None:
-        for doc in files:
-            if doc.content_type != "application/pdf":
-                raise HTTPException(
-                    status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                    detail=f"Unsupported file type: {doc.filename}. Only PDF files are allowed.",
-                )
+    files = [file for file in files if file.size != 0]
+    for doc in files:
+        if doc.content_type != "application/pdf":
+            raise HTTPException(
+                status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+                detail=f"Unsupported file type: {doc.filename}. Only PDF files are allowed.",
+            )
 
     # Verify that the chat session exists and belongs to the user
     stmt = select(ChatSession).where(
@@ -180,10 +181,9 @@ async def add_message_to_chat_session_and_generate_llm_response(
         )
 
     # Handle uploaded files
-    if files is not None and len(files) > 0:
-        documents = await handle_multiple_file_uploads(
-            files, user, str(chat_id), db, pc_svc
-        )
+    documents = await handle_multiple_file_uploads(
+        files, user, str(chat_id), db, pc_svc
+    )
 
     # Add user's message to the chat session
     user_message = ChatMessage(session_id=chat_id, role=ChatRole.USER, content=query)
@@ -239,6 +239,14 @@ async def add_message_to_chat_session_and_generate_llm_response(
     db.add(ai_message)
     await db.commit()
     await db.refresh(ai_message)
+
+    # store ndcg score in the database
+    evaluation = MessageEvaluation(
+        message_id=ai_message.id,
+        ndcg_score=ndcg_score,
+    )
+    db.add(evaluation)
+    await db.commit()
 
     return ChatMessageAIResponse(
         id=ai_message.id,
