@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from app.utils.groq import GroqService
 from app.utils.pinecone import PineconeService
 from app.core.config import settings
+from app.core.logger import logger
+from app.db.session import check_db_connection
 from app.api import documents, users, chats
 from app.middlewares.logger import LoggingMiddleware
 
@@ -13,6 +15,11 @@ FRONTEND_URLS = settings.FRONTEND_URLS
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if await check_db_connection():
+        logger.info("Successfully connected to the database.")
+    else:
+        logger.error("Failed to connect to the database.")
+
     app.state.pinecone_service = PineconeService()
     app.state.groq_service = GroqService()
     app.state.pinecone_service.initialize_clients()
